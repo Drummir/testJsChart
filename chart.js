@@ -1,6 +1,6 @@
 var INTERVAL_IN_MILLISECONDS = 1000;
 var PREHISTORY_INTERVAL = 3600;
-
+//hello
 var series = [];
 var chart = null;
 var presetsElement = document.getElementById('presets');
