@@ -1,5 +1,5 @@
-var INTERVAL_IN_MILLISECONDS = 1000;
-var PREHISTORY_INTERVAL = 3600;
+var INTERVAL_IN_MILLISECONDS = 1000;  // Как часто буду появляться точки
+var PREHISTORY_INTERVAL = 3600;       // Сколько по времени будут храниться точки
 
 var series = [];
 var chart = null;
@@ -41,7 +41,7 @@ function getObjectFromString(string) {
   const parts1 = string.split(';');
   const object = {};
 
-  for (let i = 5; i < parts1.length - 1; ++i) {
+  for (let i = 17; i < parts1.length - 1; ++i) {      // Изначально i = 5, теперь i = 17. P.S. пропуск первых значений в получаемых данных
     const parts2 = parts1[i].split('::');
 
     object[parts2[0]] = Number(parts2[1].split(':')[0]);
@@ -317,7 +317,7 @@ function createChart() {
       }
     },
     xAxis: {
-      maxZoom: 10000,         // Максимальное увеличение в навигаторе до 10 сек = вся ширина графика
+      maxZoom: 60000,         // Максимальное увеличение в навигаторе до 60 сек = минимальная ширина графика.  3600000 один час
       tickInterval: 5000,     // Интервал в милисекундах по оси Х
       title: { text: 'Время, с' },
       gridLineWidth: 1,
