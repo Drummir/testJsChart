@@ -1,5 +1,6 @@
 var INTERVAL_IN_MILLISECONDS = 1000;  // Как часто буду появляться точки
-var PREHISTORY_INTERVAL = 3600;       // Сколько по времени будут храниться точки
+var PREHISTORY_INTERVAL = 3605;       // Сколько по времени будут храниться точки отношение 1 к 5
+var LENGTH_SERIES = 0;
 
 var series = [];
 var chart = null;
@@ -7,6 +8,7 @@ var presetsElement = document.getElementById('presets');
 var selectedIndices = [];
 var selectedPreset = null;
 var selectedChkbox2 = null;
+var selectedChkbox3 = null;
 
 var tgSwitchPreset = false;
 
@@ -33,7 +35,7 @@ function tgPreset() {
 var option = [];
 
 var timeStampBuffer1 = null;
-var interval = null;
+var interval;
 var selectElementsIds = ['slct1', 'slct2', 'slct3', 'slct4'];
 var selectElements = selectElementsIds.map((x) => document.getElementById(x));
 
@@ -49,6 +51,8 @@ function getObjectFromString(string) {
 
   return object;
 };
+
+var isInitialized;
 
 async function init() {
   const csvResponse = await axios.get('/common/csv/values.csv');
@@ -67,6 +71,14 @@ async function init() {
   checkCookies();
 
   createChart();
+  updateScale();
+
+
+  if (isInitialized) {
+    return;
+  }
+
+  isInitialized = true;
 
   interval = setInterval(async function () {
     /*
@@ -78,6 +90,7 @@ async function init() {
     if (document.getElementById('presets') === null) {
       console.log('STOP INTERVAL!');
       clearInterval(interval);
+      isInitialized = false;
 
       return;
     };
@@ -90,7 +103,7 @@ async function init() {
     console.log(timeStamp);
 
     const obj = getObjectFromString(data);
-    console.warn(obj);
+    // console.warn(obj);
     const newValues = series.map((x) => Number(obj[x.id]));
     //const newValues = series.map(() => Math.random() * 1000);
 
@@ -104,8 +117,8 @@ function saveProperty() {
   let cookiesData = { series };
 
   // Запись пресетов
-  console.log(presetsElement);
-  console.log('lastIndex = ' + presetsElement.options.length);
+  // console.log(presetsElement);
+  // console.log('lastIndex = ' + presetsElement.options.length);
 
   cookiesData.presets = Array.from(presetsElement.options).map((x) => `${x.text}.${x.value}`);
 
@@ -125,6 +138,11 @@ function saveProperty() {
 
   // Запись положения ползунка
   selectedChkbox2 = Number(document.getElementById("chkBox2").checked);
+
+  // Запись положения ползунка маштаба
+  selectedChkbox3 = Number(document.getElementById("chkBox").checked);
+  cookiesData.selectedChkbox3 = Number(document.getElementById("chkBox").checked);
+
 
   document.cookie = `data = ${encodeURI(JSON.stringify(cookiesData))}; max-age=31536000`;
 };
@@ -149,6 +167,9 @@ function checkCookies() {
     // Получение положения ползунка
     selectedChkbox2 = Number(document.getElementById("chkBox2").checked);
 
+    // Получение положения ползунка
+    selectedChkbox3 = Number(document.getElementById("chkBox").checked);
+
     // GET COOKIE FOR PRESETS
     cookiesData.presets.forEach((x) => {
       const parts = x.split('.');
@@ -160,8 +181,10 @@ function checkCookies() {
 
     // GET SCALE AND TOGGLESWITCH PARAMETRS
     document.getElementById("chkBox2").checked = cookiesData.usePrstTgSw;
+    document.getElementById("chkBox").checked = cookiesData.selectedChkbox3;
+    document.getElementById("chkBox").checked ?  document.getElementById("text_switch").innerHTML = 'Динамический' :  document.getElementById("text_switch").innerHTML = 'Статический';
     tgPreset();
-    document.getElementById("text_switch").innerHTML = 'Статический';
+    //document.getElementById("text_switch").innerHTML = 'Статический';
     presetsElement.selectedIndex = cookiesData.selectPreset;
     // console.warn('cookiesData.selectedIndices', cookiesData.selectedIndices);
     cookiesData.selectedIndices.forEach((x, i) => selectElements[i].selectedIndex = x);
@@ -196,8 +219,11 @@ function checkCookies() {
 
     // Получение положения ползунка
     selectedChkbox2 = Number(document.getElementById("chkBox2").checked);
+
+    // Получение положения ползунка маштаба
+    selectedChkbox3 = Number(document.getElementById("chkBox").checked);
     
-    document.getElementById("text_switch").innerHTML = 'Статический';
+    //document.getElementById("text_switch").innerHTML = 'Статический';
     saveProperty();
   }
 }
@@ -257,7 +283,7 @@ function editPreset(operation) {
 function updateScale() {
   let tgSwitch = document.getElementById("chkBox").checked;
   let textTgSwitch = document.getElementById("text_switch");
-  console.log(textTgSwitch);
+  //console.log(textTgSwitch);
 
   if (tgSwitch) {
     // Динамический масштаб
@@ -306,7 +332,7 @@ function createChart() {
         { type: 'minute', count: 1, text: '1 мин' },
         { type: 'minute', count: 5, text: '5 мин' },
         { type: 'minute', count: 15, text: '15 мин' },
-        { type: 'all', text: 'Всё' }
+        { type: 'minute', count: 60, text: '1 час' }
       ],
       buttonTheme: {
         width: 50
@@ -350,7 +376,10 @@ function createChart() {
           // enabled: true
         },
         enableMouseTracking: true
-      }
+      },
+      // series: {
+      //   turboThreshold: 10000
+      // }
     },
     series: series.map((x, i) => ({
       type: 'spline',
@@ -383,26 +412,57 @@ function updatePoints(newValues, timeStamp) {
     (selectElements[1].selectedIndex != selectedIndices[1]) ||
     (selectElements[2].selectedIndex != selectedIndices[2]) ||
     (selectElements[3].selectedIndex != selectedIndices[3]) ||
-    (document.getElementById("chkBox2").checked != selectedChkbox2)
+    (document.getElementById("chkBox2").checked != selectedChkbox2 ||
+    document.getElementById("chkBox").checked != selectedChkbox3)
   ) {
-    console.log('Что-то поменяли');
+    // console.log('Что-то поменяли');
     saveProperty();
-  } else {
-    console.log('Ничего не меняли');
   }
+  //  else {
+  //   // console.log('Ничего не меняли');
+  // }
   
   seconds = new Date().getTime();
 
-  console.log(newValues.map((x, i) => `${i + 1}: ${x}`).join(', '));
-
+  // console.log(newValues.map((x, i) => `${i + 1}: ${x}`).join(', '));
+  if (LENGTH_SERIES < 3607) {
+    LENGTH_SERIES++;
+  }
+  
+  // console.log(`После довабления ${LENGTH_SERIES}`);
   const isBreak = null !== timeStampBuffer1 && timeStamp === timeStampBuffer1;
-
   newValues.forEach((x, i) => chart.series[i].addPoint([
     seconds,
-     isBreak ? null : x
+    //isBreak ? null : x,
     //x
-    // Math.random() * 1000
-  ], true, chart.series[i].data.length > PREHISTORY_INTERVAL));
+    Math.random() * 1000
+    
+  ], true, LENGTH_SERIES >= PREHISTORY_INTERVAL));
+
+  // if(LENGTH_SERIES >= 3067) {
+  //   // console.log(`Перед удаление ${LENGTH_SERIES}`);
+  //   LENGTH_SERIES--;
+  //   // console.log(`После удаления ${LENGTH_SERIES}`);
+  // };
+  
+  //console.log(`length = ${lengthSeries}`);
+  //, chart.series[i].data.length > PREHISTORY_INTERVAL
+  // if(lengthSeries + 1 >= PREHISTORY_INTERVAL) {
+  //   chart.series[0].removePoint(0);
+  //   chart.series[1].removePoint(0);
+  //   chart.series[2].removePoint(0);
+  //   chart.series[3].removePoint(0);
+  //   // for(let z = 0; z <= 4; ++z){
+  //   //   chart.series[z].removePoint(0);
+  //   // };
+  //   console.log("deleted");
+  //   //chart.redraw();
+  // }
+
+  // console.log(`Легенда 0: ${chart.series[0].data.length}`);
+  // console.log(`Легенда 1: ${chart.series[1].data.length}`);
+  // console.log(`Легенда 2: ${chart.series[2].data.length}`);
+  // console.log(`Легенда 3: ${chart.series[3].data.length}`);
 
 };
 
